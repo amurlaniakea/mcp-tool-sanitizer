@@ -51,3 +51,29 @@ ranges**. It does NOT close the full paper (4/8 evasion techniques). Those
 require Unicode normalization (NFKC/NFKD) and byte-fidelity comparison, scoped
 to Fase 2. The Spec ACs measure only the per-range vectors, never "100% of the
 8 techniques."
+
+## Fase 2 — what it ADDS (and what it does NOT)
+
+Fase 2 (`bytefiel.py`) implements the paper's missing structural fix: the
+approval view must be byte-faithful. It models two views — `rendered` (what the
+human perceives: NFKC + homoglyph map + hidden stripped) and `delivered` (raw
+bytes the model receives) — and rejects the tool if their canonical hashes
+diverge.
+
+**Covered by Fase 2 (verified by spike + tests):**
+- NFKC compatibility collapse (circled/fullwidth/math-bold → ASCII base).
+- Homoglyph divergence: cyrillic/greek look-alikes (e.g. `а` vs `a`, `ο` vs `o`)
+  are distinct codepoints; the human sees the Latin base, the model receives the
+  confusable. `verify_tool` flags this.
+- Hidden codepoints that survive only in the delivered context.
+
+**NOT covered (honest limitations, registered as KI-6 / KI-7):**
+- **KI-6 — bidi visual reorder**: `render_bidi()` is a minimal LTR/RTL segment
+  reversal using `unicodedata.bidirectional`, NOT the full UAX#9 layout
+  algorithm. It covers the paper's override case but not arbitrary typographic
+  reordering. A true client-side shim (capturing the actual rendered glyph
+  order) is out of scope.
+- **KI-7 — homoglyph map exhaustiveness**: `HOMOGLYPH_MAP` is a curated set
+  (common typosquatting + paper vectors), NOT the full Unicode confusables
+  database (e.g. Unicode TR39). It is a detector, not a complete confusable
+  resolver. Extending it is a future task, not a claim of completeness.

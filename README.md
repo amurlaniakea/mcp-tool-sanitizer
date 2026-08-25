@@ -79,6 +79,27 @@ print(res.clean)        # schema also sanitized (KI-4)
   the paper says evade simple string-matching (NFKC normalization, homoglyphs,
   subtle logical bidi, composition reordering). See `RESEARCH.md`.
 
+## Fase 2 — Approval-view byte-fiel
+
+Guarantees the bytes the human reviewer **sees** match the bytes the model
+**receives**. The paper's structural fix: the approval view must be byte-faithful,
+not merely visually plausible.
+
+```bash
+echo '{"name":"аlias","description":"safe","input_schema":{}}' \
+  | python -m mcp_tool_sanitizer --bytefiel
+# -> {"conforming": false, "byte_fiel": {"conforming": false, "reason": "approval-view byte divergence ..."}}
+```
+
+- `verify_tool()` compares `canonical(name/desc/schema)` (what the human perceives:
+  NFKC + homoglyph map + hidden stripped) against the **raw** delivered bytes.
+- Catches: homoglyphs (cyrillic/greek → latin look-alikes), NFKC-compat tricks,
+  and hidden codepoints that survive into the delivered context.
+- **Limitations (honest):** the bidi *visual reorder* is approximated, not a full
+  UAX#9 layout (KI-6). The homoglyph map is curated, not exhaustive (KI-7). It
+  covers the paper's vectors and the common typosquatting set, but is not a
+  complete Unicode confusables database.
+
 ## License
 
 AGPL-3.0-or-later. Author: Pedro Sordo Martínez.
