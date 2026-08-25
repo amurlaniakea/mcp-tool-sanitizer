@@ -98,11 +98,16 @@ echo '{"name":"аlias","description":"safe","input_schema":{}}' \
 - **Limitations (honest):** the bidi *visual reorder* is approximated, not a full
   UAX#9 layout (KI-6). The homoglyph map is curated, not exhaustive (KI-7). It
   covers the paper's vectors and the common typosquatting set, but is not a
-  complete Unicode confusables database. The mixed-script heuristic (KI-9)
-  applies the homoglyph map ONLY when the text is predominantly Latin with a few
-  confusable characters intercalated (the real attack pattern) — Cyrillic/Greek
-  text that is consistently one script is treated as legitimate language, not an
-  attack.
+  complete Unicode confusables database. The mixed-script heuristic (KI-9,
+  **OPEN**) applies the homoglyph map ONLY when the text is predominantly Latin
+  with a few confusable characters intercalated (the real attack pattern) —
+  Cyrillic/Greek text that is consistently one script is treated as legitimate
+  language, not an attack. **Known gap (KI-9b, OPEN):** text that is mostly
+  English with a legitimate translation block in another script (e.g.
+  `"Search files / Искать файлы в каталоге"`) still diverges, because the
+  heuristic decides aggressiveness over the whole string, not per segment. Fix
+  pending: per-segment (or local-context) aggressiveness. See `RESEARCH.md` /
+  `KNOWN_ISSUES.md` (KI-7, KI-9).
 
 ## License
 

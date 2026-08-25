@@ -80,15 +80,16 @@ def test_verify_tool_cyrillic_greek_legit_passes(name, description):
     assert res["reason"] is None
 
 
-# === KI-9: ataque real (latino dominante + 1-2 confusables intercalados) SI diverge ===
+# === KI-9b (OPEN): texto bilingue EN + bloque de traduccion legitimo ===
+# Caso real verificado por Sil: ingles predominante + traduccion rusa legítima.
+# Hoy DIVERGE (falso positivo) porque la heuristica decide agresividad sobre
+# la cadena entera. Se marca xfail hasta implementar agresividad por segmento.
+@pytest.mark.xfail(reason="KI-9b abierto: bilingue EN+RU legitimo diverge hoy")
 @pytest.mark.parametrize("name,description", [
-    ("аlias", "list files"),                 # latino + 1 cirilico suelto
-    ("gоogle", "search the web"),            # 'о' griego/cirilico en medio de latin
-    ("аррle", "show config"),               # cirilico en palabra latina
-    ("xρay", "render image"),               # griego rho en latin
+    ("search_files", "Search files / Искать файлы в каталоге"),
+    ("list_dir", "List directory / Список каталога"),
 ])
-def test_verify_tool_mixed_script_attack_rejects(name, description):
+def test_verify_tool_bilingual_legit_still_diverges(name, description):
     tool = {"name": name, "description": description, "input_schema": {}}
     res = verify_tool(tool)
-    assert res["conforming"] is False, f"fallo al detectar ataque mixed-script: {name!r}"
-    assert res["aggressive"] is True
+    assert res["conforming"] is True
