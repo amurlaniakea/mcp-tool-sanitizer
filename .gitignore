@@ -7,3 +7,7 @@ __pycache__/
 credentials/
 *.db
 store.db
+
+# coverage artifacts
+.coverage
+.coverage.*
