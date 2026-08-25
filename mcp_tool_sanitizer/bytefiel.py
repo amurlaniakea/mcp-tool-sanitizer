@@ -25,28 +25,79 @@ def _is_hidden(cp: int) -> bool:
     return 0x2066 <= cp <= 0x2069
 
 
+def _script_of(cp: int) -> str:
+    """Script aproximado por rango (latino/cirilico/griego/otro).
+
+    No es una tabla de scripts Unicode completa (KI-7): cubre los bloques
+    donde vive el ataque de typosquatting + los scripts que el usuario usa.
+    """
+    if cp <= 0x024F:  # ASCII + Latin-1 Supplement + Latin Extended-A
+        return "latin"
+    if 0x0400 <= cp <= 0x04FF:  # Cyrillic
+        return "cyrillic"
+    if 0x0370 <= cp <= 0x03FF:  # Greek and Coptic
+        return "greek"
+    # NFKC puede colapsar compatibilidad a latin; lo tratamos como latin
+    if unicodedata.normalize("NFKC", chr(cp)) != chr(cp) and _script_of(ord(unicodedata.normalize("NFKC", chr(cp)))) == "latin":
+        return "latin"
+    return "other"
+
+
 # Homoglifos comunes (confusables visuales) -> su base latina.
 # NO es exhaustivo (KI-7): cubre los del paper y los mas usados en ataques
 # de typosquatting/homoglyph. NFKC no los colapsa (son codepoints distintos).
 HOMOGLYPH_MAP = {
-    "\u0430": "a", "\u0435": "e", "\u043e": "o", "\u0440": "p", "\u0441": "c",
-    "\u0443": "y", "\u0445": "x", "\u0455": "s", "\u0456": "i", "\u0457": "i",
-    "\u0391": "A", "\u0392": "B", "\u0395": "E", "\u039a": "K", "\u039c": "M",
-    "\u039f": "O", "\u03a1": "P", "\u03a4": "T", "\u03a5": "Y", "\u03a7": "X",
-    "\u03bf": "o", "\u03c1": "p", "\u03c5": "y", "\u03c7": "x",
+    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c",
+    "у": "y", "х": "x", "ѕ": "s", "і": "i", "ї": "i",
+    "Α": "A", "Β": "B", "Ε": "E", "Κ": "K", "Μ": "M",
+    "Ο": "O", "Ρ": "P", "Τ": "T", "Υ": "Y", "Χ": "X",
+    "ο": "o", "ρ": "p", "υ": "y", "χ": "x",
 }
 
 
-def canonical(text: str) -> str:
-    """Forma canonica: NFKC + mapa de homoglifos + eliminacion de ocultos."""
+def canonical(text: str, *, aggressive: bool = False) -> str:
+    """Forma canonica: NFKC + eliminacion de ocultos.
+
+    Si aggressive=True, aplica HOMOGLYPH_MAP (mapea confusables a su base
+    latina). Si aggressive=False, NO aplica el mapeo: el texto se deja igual
+    salvo ocultos quitados.
+
+    KI-9: el mapeo es agresivo SOLO cuando el texto es mixto con latino
+    dominante (patron de ataque). Texto 100% cirilico/griego legítimo se
+    deja intacto (aggressive=False) => no diverge falsamente.
+    """
     n = unicodedata.normalize("NFKC", text)
     out = []
     for ch in n:
         cp = ord(ch)
         if _is_hidden(cp):
             continue
-        out.append(HOMOGLYPH_MAP.get(ch, ch))
+        if aggressive:
+            out.append(HOMOGLYPH_MAP.get(ch, ch))
+        else:
+            out.append(ch)
     return "".join(out)
+
+
+def dominant_is_latin(text: str) -> bool | None:
+    """True si el script dominante es latino; None si no hay suficiente senal.
+
+    Cuenta solo chars con script latin/cirilico/griego (ignora espacios,
+    puntuacion, digitos, ocultos). Si la mayoria es latina => True.
+    Si la mayoria es cirilico/griego => False (texto de un solo script no-latino).
+    Si no hay suficientes chars con script (<=1) => None (no decidir, tratar
+    como latino por defecto: es seguro porque un char suelto confusable dentro
+    de latin SI es el patron de ataque).
+    """
+    counts = {"latin": 0, "cyrillic": 0, "greek": 0}
+    for ch in text:
+        s = _script_of(ord(ch))
+        if s in counts:
+            counts[s] += 1
+    total = sum(counts.values())
+    if total <= 1:
+        return None
+    return counts["latin"] >= counts["cyrillic"] and counts["latin"] >= counts["greek"]
 
 
 def canon_hash(text: str) -> str:
@@ -100,19 +151,29 @@ def render_bidi(text: str) -> str:
 def verify_tool(tool: dict) -> dict:
     """Compara la vista renderizada vs la entregada (byte-fiel).
 
-    rendered = lo que el humano PERCIBE = canonical(name/desc/schema)
-        (NFKC colapsa homoglifos a su base latino: cirilico 'a' -> 'a').
-    delivered = los bytes CRUDOS que el modelo recibe (sin canonicalizar).
-    Si divergen => el tool engaña al revisor (ve X, modelo recibe Y).
+    rendered = lo que el humano PERCIBE.
+    delivered = los bytes CRUDOS que el modelo recibe.
+
+    Heuristica mixed-script (KI-9):
+      - Si el delivered es predominantemente LATINO y contiene confusables de
+        otro script => aggressive=True (mapear homoglifos: el humano ve 'a',
+        el modelo recibe cirilico 'а' => divergencia real de ataque).
+      - Si el delivered es consistentemente de UN script no-latino (ruso,
+        griego puro) => aggressive=False (no mapear: es idioma, no ataque;
+        rendered == delivered => no diverge).
     """
     name = tool.get("name", "")
     description = tool.get("description", "")
     schema = tool.get("input_schema", {})
 
-    rendered = canonical(f"{name}\n{description}\n{schema!s}")
-    delivered = f"{name}\n{description}\n{schema!s}"
+    raw = f"{name}\n{description}\n{schema!s}"
+    dom = dominant_is_latin(raw)
+    # agresivo solo si domina latino (o senal insuficiente => por defecto latino)
+    aggressive = dom is not False
 
-    # rendered ya es canonico (NFKC + homoglyph + ocultos); delivered es crudo.
+    rendered = canonical(raw, aggressive=aggressive)
+    delivered = raw  # crudo
+
     h_r = canon_hash(rendered)
     h_d = canon_hash(delivered)
     ok = h_r == h_d
@@ -121,4 +182,5 @@ def verify_tool(tool: dict) -> dict:
         "reason": None if ok else "approval-view byte divergence (rendered != delivered)",
         "hash_rendered": h_r,
         "hash_delivered": h_d,
+        "aggressive": aggressive,
     }

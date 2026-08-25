@@ -77,3 +77,16 @@ diverge.
   (common typosquatting + paper vectors), NOT the full Unicode confusables
   database (e.g. Unicode TR39). It is a detector, not a complete confusable
   resolver. Extending it is a future task, not a claim of completeness.
+- **KI-9 — false positive on legitimate Cyrillic/Greek (CLOSED, 2026-08-25):**
+  `HOMOGLYPH_MAP` originally translated ANY common Cyrillic/Greek letter to its
+  Latin base unconditionally. Because `rendered = canonical(...)` applied that
+  map while `delivered` stayed raw, ANY tool whose `name`/`description` was in
+  Russian/Bulgarian/Serbian/Greek diverged and was rejected with no real attack
+  (the map could not tell "a confusable slipped into Latin text" from "text
+  normally written in another alphabet"). Reproduced: `name="Показать"` → DIVERGE.
+  **Fix (design, not cosmetic):** `verify_tool` now uses a mixed-script
+  heuristic — the homoglyph map is applied ONLY when the dominant script is
+  Latin with a few confusables intercalated (the real typosquatting pattern);
+  text consistently in one non-Latin script is left intact (no divergence).
+  Tests: legitimate Cyrillic/Greek phrases → conforming; Latin word with 1–2
+  Cyrillic/Greek chars intercalated → rejected. Coverage: 60 passed.

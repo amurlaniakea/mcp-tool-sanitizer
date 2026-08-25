@@ -98,7 +98,11 @@ echo '{"name":"аlias","description":"safe","input_schema":{}}' \
 - **Limitations (honest):** the bidi *visual reorder* is approximated, not a full
   UAX#9 layout (KI-6). The homoglyph map is curated, not exhaustive (KI-7). It
   covers the paper's vectors and the common typosquatting set, but is not a
-  complete Unicode confusables database.
+  complete Unicode confusables database. The mixed-script heuristic (KI-9)
+  applies the homoglyph map ONLY when the text is predominantly Latin with a few
+  confusable characters intercalated (the real attack pattern) — Cyrillic/Greek
+  text that is consistently one script is treated as legitimate language, not an
+  attack.
 
 ## License
 

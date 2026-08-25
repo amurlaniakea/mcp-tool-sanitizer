@@ -18,16 +18,17 @@ def test_nfkc_no_diverge(rendered, delivered):
     assert diverges(canonical(rendered), canonical(delivered)) is False
 
 
-# Homoglifos: el humano PERCIBE el canonico (NFKC+homoglyph map), el modelo
-# RECIBE el codepoint confusable. diverges(canonical(visto), crudo_recibido).
+# Homoglifos: el humano PERCIBE el canonico (NFKC+homoglyph map agresivo),
+# el modelo RECIBE el codepoint confusable. diverges(canonical(visto,
+# aggressive=True), crudo_recibido).
 @pytest.mark.parametrize("homoglyph,latin", [
-    ("\u03bf", "o"),   # greek omicron vs o
-    ("\u0430", "a"),   # cyrillic a vs a
+    ("ο", "o"),   # greek omicron vs o
+    ("а", "a"),   # cyrillic a vs a
 ])
 def test_homoglyph_diverges(homoglyph, latin):
-    assert diverges(canonical(homoglyph), homoglyph) is True
-    # a la inversa, el canonico coincide con el latin:
-    assert canonical(homoglyph) == latin
+    assert diverges(canonical(homoglyph, aggressive=True), homoglyph) is True
+    # a la inversa, el canonico agresivo coincide con el latin:
+    assert canonical(homoglyph, aggressive=True) == latin
 
 
 def test_tag_hidden_in_delivered_diverges():
@@ -57,8 +58,37 @@ def test_verify_tool_clean_passes():
 
 def test_verify_tool_divergent_rejects():
     # homoglyph en el nombre que Fase1 no ve pero Fase2 si
-    tool = {"name": "\u0430lias", "description": "safe", "input_schema": {}}
+    tool = {"name": "аlias", "description": "safe", "input_schema": {}}
     res = verify_tool(tool)
     assert res["conforming"] is False
     assert "divergence" in res["reason"]
     assert res["hash_rendered"] != res["hash_delivered"]
+
+
+# === KI-9: texto cirilico/griego legitimo NO debe diverger ===
+@pytest.mark.parametrize("name,description", [
+    ("Показать", "Показать файлы в каталоге"),          # ruso real, sin ataque
+    ("покажи", "покажи список файлов в папке"),          # ruso
+    ("Εμφάνιση", "Εμφάνιση αρχείων στον κατάλογο"),     # griego real, sin ataque
+    ("δείξε", "δείξε τα αρχεία του φακέλου"),           # griego
+    ("Прикажи", "Прикажи листање датотека"),            # serbio cirilico
+])
+def test_verify_tool_cyrillic_greek_legit_passes(name, description):
+    tool = {"name": name, "description": description, "input_schema": {}}
+    res = verify_tool(tool)
+    assert res["conforming"] is True, f"falso positivo KI-9 en texto legitimo: {name!r}"
+    assert res["reason"] is None
+
+
+# === KI-9: ataque real (latino dominante + 1-2 confusables intercalados) SI diverge ===
+@pytest.mark.parametrize("name,description", [
+    ("аlias", "list files"),                 # latino + 1 cirilico suelto
+    ("gоogle", "search the web"),            # 'о' griego/cirilico en medio de latin
+    ("аррle", "show config"),               # cirilico en palabra latina
+    ("xρay", "render image"),               # griego rho en latin
+])
+def test_verify_tool_mixed_script_attack_rejects(name, description):
+    tool = {"name": name, "description": description, "input_schema": {}}
+    res = verify_tool(tool)
+    assert res["conforming"] is False, f"fallo al detectar ataque mixed-script: {name!r}"
+    assert res["aggressive"] is True
