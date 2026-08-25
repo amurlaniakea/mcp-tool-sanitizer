@@ -109,6 +109,31 @@ echo '{"name":"аlias","description":"safe","input_schema":{}}' \
   pending: per-segment (or local-context) aggressiveness. See `RESEARCH.md` /
   `KNOWN_ISSUES.md` (KI-7, KI-9).
 
+## Estado actual / Limitaciones conocidas
+
+This is **not a perfect project** — external audit (Claude, 2026-08-25)
+assigned a concrete **7/10** score with justification, not a vague "works
+well". Honest summary:
+
+- **Scope is narrow:** covers ONE paper (arXiv:2607.05744), and not even all of
+  it — 4/8 concealment techniques from the paper remain unaddressed (KI-2).
+  Phase 1 only catches the 3 range-based vectors (TAG/zero-width/bidi) the
+  paper says a string-match DOES catch.
+- **Open gaps:** KI-6 (bidi is not real UAX#9), KI-7 (homoglyph map is not
+  TR39), KI-9b (false positive on bilingual docs — English + a legitimate
+  translation block in another script; OPEN, no scheduled fix date). KI-9 is
+  partially closed (100%-single-script text no longer diverges).
+- **No real usage yet:** 0 stars, no real MCP traffic. Everything we claim
+  "works" comes from our own tests (60 passed + 2 xfailed), NOT production
+  deployment. No validation against real hostile MCP servers.
+- **External audit recorded:** Claude's review found KI-9 (reproduced with
+  `Показать`), corrected the silent deletion of KI-7 in the vault, and opened
+  KI-9b (bilingual). The 7/10 reflects "closes the paper's structural gap in a
+  verifiable way, but with known gaps and no real-world mileage".
+
+These gaps (especially KI-9b) will be addressed in the next maintenance
+round — they have not been forgotten.
+
 ## License
 
 AGPL-3.0-or-later. Author: Pedro Sordo Martínez.
