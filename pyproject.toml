@@ -1,0 +1,23 @@
+[project]
+name = "mcp-tool-sanitizer"
+version = "0.1.0"
+description = "Detect and neutralize Unicode concealment codepoints in MCP tool metadata (covert-channel control)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "AGPL-3.0-or-later" }
+authors = [{ name = "Pedro Sordo Martinez", email = "amurlaniakea@gmail.com" }]
+keywords = ["mcp", "llm", "security", "unicode", "prompt-injection", "agent-security"]
+dependencies = []
+
+[project.optional-dependencies]
+testing = ["pytest>=8", "pytest-cov>=5"]
+
+[project.scripts]
+mcp-tool-sanitizer = "mcp_tool_sanitizer.cli:main"
+
+[tool.pytest.ini_options]
+markers = ["slow: requires network / large benchmark"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
