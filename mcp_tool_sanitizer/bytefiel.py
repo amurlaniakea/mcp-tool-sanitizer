@@ -55,27 +55,79 @@ HOMOGLYPH_MAP = {
 }
 
 
+def _split_words(text: str) -> list[str]:
+    """Divide en palabras (segmentos separados por espacio/punctuacion fuerte).
+
+    Los separadores son cualquier char cuyo script es 'other' O es espacio o
+    punctuation. Esto aísla el bloque cirilico 'Искать' de la palabra latina
+    'Search' en texto bilingue.
+    """
+    words = []
+    cur = []
+    for ch in text:
+        s = _script_of(ord(ch))
+        if s == "other" or ch.isspace() or (unicodedata.category(ch).startswith("P")):
+            if cur:
+                words.append("".join(cur))
+                cur = []
+        else:
+            cur.append(ch)
+    if cur:
+        words.append("".join(cur))
+    return [w for w in words if w]
+
+
+def _word_is_latin(word: str) -> bool | None:
+    """True si la palabra es latina-dominated; False si cirilico/griego puro;
+    None si no hay senal suficiente (<=1 char con script)."""
+    counts = {"latin": 0, "cyrillic": 0, "greek": 0}
+    for ch in word:
+        s = _script_of(ord(ch))
+        if s in counts:
+            counts[s] += 1
+    total = sum(counts.values())
+    if total == 0:
+        return None
+    if total <= 1:
+        return None
+    return counts["latin"] >= counts["cyrillic"] and counts["latin"] >= counts["greek"]
+
+
 def canonical(text: str, *, aggressive: bool = False) -> str:
     """Forma canonica: NFKC + eliminacion de ocultos.
 
-    Si aggressive=True, aplica HOMOGLYPH_MAP (mapea confusables a su base
-    latina). Si aggressive=False, NO aplica el mapeo: el texto se deja igual
-    salvo ocultos quitados.
+    Si aggressive=True, aplica HOMOGLYPH_MAP, PERO solo a los confusables que
+    viven en un contexto LATINO local (palabra latina-dominated). Un bloque
+    100% cirilico/griego dentro de texto bilingue NO se mapea; un confusable
+    suelto incrustado en una palabra latina SI se mapea.
 
-    KI-9: el mapeo es agresivo SOLO cuando el texto es mixto con latino
-    dominante (patron de ataque). Texto 100% cirilico/griego legítimo se
-    deja intacto (aggressive=False) => no diverge falsamente.
+    Esto cierra KI-9b: la agresividad es por segmento/palabra, no por la
+    cadena entera. Asi 'Search files / Искать файлы' no diverge (el bloque
+    cirilico conserva sus glifos), pero 'аlias' si diverge.
     """
     n = unicodedata.normalize("NFKC", text)
+    if not aggressive:
+        return "".join(ch for ch in n if not _is_hidden(ord(ch)))
+
+    # precalcular si cada palabra es latina
+    words = _split_words(n)
+    word_latin = {}
+    for w in words:
+        word_latin[w] = _word_is_latin(w)
+
     out = []
     for ch in n:
         cp = ord(ch)
         if _is_hidden(cp):
             continue
-        if aggressive:
-            out.append(HOMOGLYPH_MAP.get(ch, ch))
-        else:
-            out.append(ch)
+        if ch in HOMOGLYPH_MAP:
+            # decidir por contexto local: la palabra que contiene este char
+            host = next((w for w in words if ch in w), None)
+            latin_ctx = word_latin.get(host, True)  # por defecto latin (senal debil)
+            if latin_ctx:
+                out.append(HOMOGLYPH_MAP[ch])
+                continue
+        out.append(ch)
     return "".join(out)
 
 
@@ -154,25 +206,23 @@ def verify_tool(tool: dict) -> dict:
     rendered = lo que el humano PERCIBE.
     delivered = los bytes CRUDOS que el modelo recibe.
 
-    Heuristica mixed-script (KI-9):
-      - Si el delivered es predominantemente LATINO y contiene confusables de
-        otro script => aggressive=True (mapear homoglifos: el humano ve 'a',
-        el modelo recibe cirilico 'а' => divergencia real de ataque).
-      - Si el delivered es consistentemente de UN script no-latino (ruso,
-        griego puro) => aggressive=False (no mapear: es idioma, no ataque;
-        rendered == delivered => no diverge).
+    Heuristica por contexto local (KI-9b cerrado): el mapeo de homoglifos se
+    aplica SOLO a confusables que viven en una palabra latina-dominated. Un
+    bloque cirilico/griego dentro de texto bilingue conserva sus glifos (no
+    diverge); un confusable suelto en palabra latina diverge (ataque real).
     """
     name = tool.get("name", "")
     description = tool.get("description", "")
     schema = tool.get("input_schema", {})
 
     raw = f"{name}\n{description}\n{schema!s}"
-    dom = dominant_is_latin(raw)
-    # agresivo solo si domina latino (o senal insuficiente => por defecto latino)
-    aggressive = dom is not False
-
-    rendered = canonical(raw, aggressive=aggressive)
-    delivered = raw  # crudo
+    # aggressive=True activa el mapeo por-contexto-local (ver canonical)
+    rendered = canonical(raw, aggressive=True)
+    # delivered tambien se normaliza (NFKC + ocultos) para que la comparacion
+    # sea simetrica: el unico diferenciador es el mapa de homoglifos por
+    # contexto. Sin esto, NFKC aplicado solo a rendered rompe texto no-latino
+    # puro (ej. ϐ -> β) introduciendo divergencia espuria.
+    delivered = canonical(raw, aggressive=False)
 
     h_r = canon_hash(rendered)
     h_d = canon_hash(delivered)
@@ -182,5 +232,5 @@ def verify_tool(tool: dict) -> dict:
         "reason": None if ok else "approval-view byte divergence (rendered != delivered)",
         "hash_rendered": h_r,
         "hash_delivered": h_d,
-        "aggressive": aggressive,
+        "aggressive": True,
     }

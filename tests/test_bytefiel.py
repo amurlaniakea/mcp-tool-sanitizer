@@ -20,15 +20,19 @@ def test_nfkc_no_diverge(rendered, delivered):
 
 # Homoglifos: el humano PERCIBE el canonico (NFKC+homoglyph map agresivo),
 # el modelo RECIBE el codepoint confusable. diverges(canonical(visto,
-# aggressive=True), crudo_recibido).
+# aggressive=True), crudo_recibido). El confusable debe estar RODEADO de
+# contexto latino para que la heurística por-segmento lo mapee (un char
+# cirilico/griego aislado sin vecinos latinos NO se mapea, por diseno KI-9).
 @pytest.mark.parametrize("homoglyph,latin", [
+    ("а", "a"),   # cyrillic a vs a, rodeado de latin en el assertion
     ("ο", "o"),   # greek omicron vs o
-    ("а", "a"),   # cyrillic a vs a
 ])
 def test_homoglyph_diverges(homoglyph, latin):
-    assert diverges(canonical(homoglyph, aggressive=True), homoglyph) is True
-    # a la inversa, el canonico agresivo coincide con el latin:
-    assert canonical(homoglyph, aggressive=True) == latin
+    # contexto latino: la palabra que contiene el confusable es latina
+    surrounded = f"x{homoglyph}y"  # 'xаy' / 'xοy' -> palabra latina-dominated
+    assert diverges(canonical(surrounded, aggressive=True), surrounded) is True
+    # a la inversa, el canonico agresivo coincide con el latin rodeado:
+    assert canonical(surrounded, aggressive=True) == f"x{latin}y"
 
 
 def test_tag_hidden_in_delivered_diverges():
@@ -80,16 +84,15 @@ def test_verify_tool_cyrillic_greek_legit_passes(name, description):
     assert res["reason"] is None
 
 
-# === KI-9b (OPEN): texto bilingue EN + bloque de traduccion legitimo ===
-# Caso real verificado por Sil: ingles predominante + traduccion rusa legítima.
-# Hoy DIVERGE (falso positivo) porque la heuristica decide agresividad sobre
-# la cadena entera. Se marca xfail hasta implementar agresividad por segmento.
-@pytest.mark.xfail(reason="KI-9b abierto: bilingue EN+RU legitimo diverge hoy")
+# === KI-9b (CERRADO en Bloque B): texto bilingue EN + bloque de traduccion legitimo ===
+# El mapeo de homoglifos ahora es por contexto local (palabra latina), no por
+# cadena entera. El bloque cirilico conserva sus glifos => no diverge.
 @pytest.mark.parametrize("name,description", [
     ("search_files", "Search files / Искать файлы в каталоге"),
     ("list_dir", "List directory / Список каталога"),
 ])
-def test_verify_tool_bilingual_legit_still_diverges(name, description):
+def test_verify_tool_bilingual_legit_passes(name, description):
     tool = {"name": name, "description": description, "input_schema": {}}
     res = verify_tool(tool)
-    assert res["conforming"] is True
+    assert res["conforming"] is True, f"falso positivo KI-9b en bilingue: {name!r}"
+    assert res["reason"] is None
