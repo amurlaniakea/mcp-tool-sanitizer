@@ -10,7 +10,7 @@ keywords = ["mcp", "llm", "security", "unicode", "prompt-injection", "agent-secu
 dependencies = []
 
 [project.optional-dependencies]
-testing = ["pytest>=8", "pytest-cov>=5"]
+testing = ["pytest>=8", "pytest-cov>=5", "hypothesis>=6"]
 
 [project.scripts]
 mcp-tool-sanitizer = "mcp_tool_sanitizer.cli:main"
