@@ -99,15 +99,13 @@ echo '{"name":"аlias","description":"safe","input_schema":{}}' \
   UAX#9 layout (KI-6). The homoglyph map is curated, not exhaustive (KI-7). It
   covers the paper's vectors and the common typosquatting set, but is not a
   complete Unicode confusables database. The mixed-script heuristic (KI-9,
-  **OPEN**) applies the homoglyph map ONLY when the text is predominantly Latin
-  with a few confusable characters intercalated (the real attack pattern) —
-  Cyrillic/Greek text that is consistently one script is treated as legitimate
-  language, not an attack. **Known gap (KI-9b, OPEN):** text that is mostly
-  English with a legitimate translation block in another script (e.g.
-  `"Search files / Искать файлы в каталоге"`) still diverges, because the
-  heuristic decides aggressiveness over the whole string, not per segment. Fix
-  pending: per-segment (or local-context) aggressiveness. See `RESEARCH.md` /
-  `KNOWN_ISSUES.md` (KI-7, KI-9).
+  **CLOSED**) applies the homoglyph map per local context (Latin-dominated word),
+  not per whole string — Cyrillic/Greek text (consistent or as a translation
+  block in otherwise-English docs) is treated as legitimate language, not an
+  attack. **KI-9b (CLOSED, 2026-08-26):** the bilingual false positive is fixed
+  by the per-word context heuristic; a second bug (NFKC asymmetry between
+  rendered/delivered) surfaced during fuzzing (inv4) and was fixed so non-Latin
+  text stays byte-faithful. See `RESEARCH.md` / `KNOWN_ISSUES.md` (KI-6, KI-7, KI-9).
 
 ## Estado actual / Limitaciones conocidas
 
@@ -119,19 +117,26 @@ well". Honest summary:
   it — 4/8 concealment techniques from the paper remain unaddressed (KI-2).
   Phase 1 only catches the 3 range-based vectors (TAG/zero-width/bidi) the
   paper says a string-match DOES catch.
+- **Closed gaps (this round):** KI-9b (false positive on bilingual docs —
+  English + a legitimate translation block in another script) is **CLOSED
+  (2026-08-26)** via per-word local-context aggressiveness. The fix also closed
+  a second, fuzzing-found bug: NFKC was applied asymmetrically to rendered vs
+  delivered, breaking byte-faithfulness of non-Latin text (e.g. `ϐ` → `β`).
+  Fuzzing (inv4, 1000 examples) caught this; no hand-written test had. KI-9 is
+  now fully closed (single-script and bilingual non-Latin text do not diverge).
 - **Open gaps:** KI-6 (bidi is not real UAX#9), KI-7 (homoglyph map is not
-  TR39), KI-9b (false positive on bilingual docs — English + a legitimate
-  translation block in another script; OPEN, no scheduled fix date). KI-9 is
-  partially closed (100%-single-script text no longer diverges).
+  TR39). KI-2 (4/8 paper techniques unaddressed) still open.
 - **No real usage yet:** 0 stars, no real MCP traffic. Everything we claim
-  "works" comes from our own tests (60 passed + 2 xfailed), NOT production
+  "works" comes from our own tests (62 passed, 0 xfailed), NOT production
   deployment. No validation against real hostile MCP servers.
 - **External audit recorded:** Claude's review found KI-9 (reproduced with
   `Показать`), corrected the silent deletion of KI-7 in the vault, and opened
-  KI-9b (bilingual). The 7/10 reflects "closes the paper's structural gap in a
-  verifiable way, but with known gaps and no real-world mileage".
+  KI-9b (bilingual). The 7/10 score (assigned 2026-08-25, NOT revised here) is
+  recorded as-is; re-evaluation pending reader's hands-on review. The KI-9b
+  closure included a fuzzing-found NFKC asymmetry fix — documented honestly,
+  not as a first-try clean fix.
 
-These gaps (especially KI-9b) will be addressed in the next maintenance
+These gaps (KI-6, KI-7, KI-2) will be addressed in the next maintenance
 round — they have not been forgotten.
 
 ## License
