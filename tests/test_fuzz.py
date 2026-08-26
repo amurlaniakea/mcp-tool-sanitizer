@@ -57,3 +57,29 @@ def test_inv3_sanitize_text_idempotent(text, mode):
     once = sanitize_text(text, mode)
     twice = sanitize_text(once, mode)
     assert twice == once
+
+
+# Bloque B: texto consistentemente de UN SOLO script no-latino (cirilico o
+# griego puro, sin mezcla) nunca debe diverger en verify_tool.
+from mcp_tool_sanitizer.bytefiel import verify_tool
+
+CYRILLIC_TEXT = st.text(
+    alphabet=st.characters(min_codepoint=0x0400, max_codepoint=0x04FF),
+    min_size=0, max_size=100,
+)
+GREEK_TEXT = st.text(
+    alphabet=st.characters(min_codepoint=0x0370, max_codepoint=0x03FF),
+    min_size=0, max_size=100,
+)
+
+
+@settings(max_examples=1000, deadline=None)
+@given(
+    name=CYRILLIC_TEXT,
+    description=GREEK_TEXT,
+    schema=st.sampled_from([{}, {"type": "object"}]),
+)
+def test_inv4_single_script_nonlatin_never_diverges(name, description, schema):
+    tool = {"name": name, "description": description, "input_schema": schema}
+    res = verify_tool(tool)
+    assert res["conforming"] is True, f"no-latino puro no debe diverger: {name!r} / {description!r}"
