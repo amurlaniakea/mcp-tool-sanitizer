@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Pedro Sordo Martínez <amurlaniakea@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Sanitizador de metadata MCP — detección y neutralización de ocultamiento.
 
 Fase 1 (spec 001-mvp). 0 dependencias en runtime (solo stdlib).

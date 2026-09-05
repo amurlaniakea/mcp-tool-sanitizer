@@ -1,11 +1,16 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "mcp-tool-sanitizer"
 version = "0.1.0"
 description = "Detect and neutralize Unicode concealment codepoints in MCP tool metadata (covert-channel control)."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "AGPL-3.0-or-later" }
-authors = [{ name = "Pedro Sordo Martinez", email = "amurlaniakea@gmail.com" }]
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "Pedro Sordo Martínez", email = "amurlaniakea@gmail.com" }]
 keywords = ["mcp", "llm", "security", "unicode", "prompt-injection", "agent-security"]
 dependencies = []
 

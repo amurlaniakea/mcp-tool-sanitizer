@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Pedro Sordo Martínez <amurlaniakea@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Entry point del paquete."""
 from .ranges import HIDDEN_CODEPOINTS, is_hidden
 from .sanitize import Finding, SanitizeResult, find_hidden, sanitize_text, sanitize_tool
