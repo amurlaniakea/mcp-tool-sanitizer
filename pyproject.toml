@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-tool-sanitizer"
-version = "0.1.0"
+version = "0.2.0"
 description = "Detect and neutralize Unicode concealment codepoints in MCP tool metadata (covert-channel control)."
 readme = "README.md"
 requires-python = ">=3.10"
