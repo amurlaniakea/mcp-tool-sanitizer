@@ -8,6 +8,11 @@ credentials/
 *.db
 store.db
 
+# build artifacts (PEP 517/518)
+dist/
+build/
+*.egg-info/
+
 # coverage artifacts
 .coverage
 .coverage.*

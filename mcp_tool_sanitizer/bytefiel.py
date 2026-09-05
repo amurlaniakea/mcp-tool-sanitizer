@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Pedro Sordo Martínez <amurlaniakea@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Approval-view byte-fiel (Fase 2).
 
 Garantiza que los bytes que el cliente renderiza en el dialogo de aprobacion

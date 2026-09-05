@@ -1,3 +1,5 @@
+# Copyright (C) 2026 Pedro Sordo Martínez <amurlaniakea@gmail.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Codepoints de ocultamiento (concealment encoding) para metadata MCP.
 
 Basado en arXiv:2607.05744 (Rashidi, 2026-07-07): TAG-block, zero-width,
